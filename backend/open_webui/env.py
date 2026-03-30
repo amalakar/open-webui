@@ -374,6 +374,12 @@ else:
     except Exception:
         DATABASE_POOL_RECYCLE = 3600
 
+# AWS RDS IAM authentication.  Set DATABASE_AUTH=iam to use short-lived IAM
+# tokens instead of a static password.  Requires DATABASE_HOST, DATABASE_PORT,
+# DATABASE_USER, and AWS_REGION (or boto3 default region) to be set.  The IAM
+# role / instance profile must have rds-db:connect permission.
+DATABASE_AUTH = os.environ.get('DATABASE_AUTH', '').lower()
+
 DATABASE_ENABLE_SQLITE_WAL = os.environ.get('DATABASE_ENABLE_SQLITE_WAL', 'False').lower() == 'true'
 
 DATABASE_USER_ACTIVE_STATUS_UPDATE_INTERVAL = os.environ.get('DATABASE_USER_ACTIVE_STATUS_UPDATE_INTERVAL', None)

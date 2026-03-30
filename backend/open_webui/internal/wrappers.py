@@ -41,7 +41,21 @@ class ReconnectingPostgresqlDatabase(CustomReconnectMixin, PostgresqlDatabase):
     pass
 
 
-def register_connection(db_url):
+class IAMPostgresqlDatabase(CustomReconnectMixin, PostgresqlDatabase):
+    """PostgreSQL database that uses RDS IAM auth tokens instead of static passwords."""
+
+    def _connect(self):
+        from open_webui.internal.iam import generate_rds_iam_token
+
+        self.connect_params['password'] = generate_rds_iam_token(
+            host=self.connect_params.get('host'),
+            port=self.connect_params.get('port', 5432),
+            user=self.connect_params.get('user'),
+        )
+        return super()._connect()
+
+
+def register_connection(db_url, use_iam_auth=False):
     # Check if using SQLCipher protocol
     if db_url.startswith('sqlite+sqlcipher://'):
         database_password = os.environ.get('DATABASE_PASSWORD')
@@ -71,8 +85,9 @@ def register_connection(db_url):
             # Get the connection details
             connection = parse(db_url, unquote_user=True, unquote_password=True)
 
-            # Use our custom database class that supports reconnection
-            db = ReconnectingPostgresqlDatabase(**connection)
+            # Use IAM auth or standard reconnecting database
+            db_class = IAMPostgresqlDatabase if use_iam_auth else ReconnectingPostgresqlDatabase
+            db = db_class(**connection)
             db.connect(reuse_if_open=True)
         elif isinstance(db, SqliteDatabase):
             # Enable autoconnect for SQLite databases, managed by Peewee

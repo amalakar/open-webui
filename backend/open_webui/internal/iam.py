@@ -48,6 +48,11 @@ def generate_rds_iam_token(
     user: str = 'openwebui_rw',
 ) -> str:
     """Generate a short-lived RDS IAM authentication token."""
+    if not host:
+        raise ValueError('DATABASE_AUTH=aws_iam requires a PostgreSQL host in DATABASE_HOST or DATABASE_URL')
+    if not user:
+        raise ValueError('DATABASE_AUTH=aws_iam requires a PostgreSQL user in DATABASE_USER or DATABASE_URL')
+
     region = get_aws_region()
     client = _get_rds_client(region)
     token = client.generate_db_auth_token(

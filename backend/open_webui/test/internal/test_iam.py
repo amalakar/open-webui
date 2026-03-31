@@ -28,3 +28,13 @@ def test_raises_when_no_region_configured(monkeypatch):
         mock_boto3.session.Session.return_value.region_name = None
         with pytest.raises(ValueError, match='AWS_REGION'):
             get_aws_region()
+
+
+def test_raises_when_host_missing():
+    with pytest.raises(ValueError, match='DATABASE_HOST'):
+        generate_rds_iam_token(host=None, port=5432, user='app')
+
+
+def test_raises_when_user_missing():
+    with pytest.raises(ValueError, match='DATABASE_USER'):
+        generate_rds_iam_token(host='db.example.com', port=5432, user=None)

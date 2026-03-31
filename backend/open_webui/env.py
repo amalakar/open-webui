@@ -8,6 +8,7 @@ import shutil
 import traceback
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlparse
 from uuid import uuid4
 from pathlib import Path
 from cryptography.hazmat.primitives import serialization
@@ -373,6 +374,38 @@ else:
         DATABASE_POOL_RECYCLE = int(DATABASE_POOL_RECYCLE)
     except Exception:
         DATABASE_POOL_RECYCLE = 3600
+
+# Cloud-native database authentication.  Supported values:
+#   aws_iam  - AWS RDS/Aurora IAM auth (short-lived tokens via boto3)
+# Requires DATABASE_HOST, DATABASE_PORT, DATABASE_USER, and AWS_REGION.
+# The IAM role / instance profile must have rds-db:connect permission.
+DATABASE_AUTH = os.environ.get('DATABASE_AUTH', '').lower()
+
+if DATABASE_AUTH == 'aws_iam':
+    _iam_missing = []
+    if 'postgresql' in DATABASE_URL:
+        _parsed_db_url = urlparse(DATABASE_URL)
+        if not _parsed_db_url.hostname:
+            _iam_missing.append('DATABASE_HOST (or a postgresql:// DATABASE_URL with host)')
+        if not _parsed_db_url.username:
+            _iam_missing.append('DATABASE_USER (or a postgresql:// DATABASE_URL with user)')
+    else:
+        if not os.environ.get('DATABASE_HOST'):
+            _iam_missing.append('DATABASE_HOST (or a postgresql:// DATABASE_URL)')
+        if not os.environ.get('DATABASE_USER'):
+            _iam_missing.append('DATABASE_USER (or a postgresql:// DATABASE_URL)')
+    if _iam_missing:
+        raise ValueError(
+            f'DATABASE_AUTH=aws_iam requires: {", ".join(_iam_missing)}'
+        )
+
+    # RDS IAM auth mandates TLS.  Ensure sslmode is set in DATABASE_URL.
+    if 'postgresql' in DATABASE_URL:
+        _db_query = dict(parse_qsl(_parsed_db_url.query, keep_blank_values=True))
+        if 'sslmode' not in _db_query:
+            _db_query['sslmode'] = 'require'
+            DATABASE_URL = _parsed_db_url._replace(query=urlencode(_db_query)).geturl()
+            log.info('DATABASE_AUTH=aws_iam: appended sslmode=require to DATABASE_URL')
 
 DATABASE_ENABLE_SQLITE_WAL = os.environ.get('DATABASE_ENABLE_SQLITE_WAL', 'False').lower() == 'true'
 

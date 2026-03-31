@@ -3,8 +3,8 @@ from logging.config import fileConfig
 
 from alembic import context
 from open_webui.models.auths import Auth
-from open_webui.env import DATABASE_URL, DATABASE_PASSWORD, LOG_FORMAT
-from sqlalchemy import engine_from_config, pool, create_engine
+from open_webui.env import DATABASE_URL, DATABASE_AUTH, DATABASE_PASSWORD, LOG_FORMAT
+from sqlalchemy import engine_from_config, event, pool, create_engine
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -100,6 +100,18 @@ def run_migrations_online() -> None:
             prefix='sqlalchemy.',
             poolclass=pool.NullPool,
         )
+
+    # Hook IAM token generation for AWS RDS/Aurora
+    if DATABASE_AUTH == 'aws_iam' and DB_URL and 'postgresql' in DB_URL:
+        from open_webui.internal.iam import generate_rds_iam_token
+
+        @event.listens_for(connectable, 'do_connect')
+        def _provide_iam_token(dialect, conn_rec, cargs, cparams):
+            cparams['password'] = generate_rds_iam_token(
+                host=cparams.get('host'),
+                port=cparams.get('port', 5432),
+                user=cparams.get('user'),
+            )
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

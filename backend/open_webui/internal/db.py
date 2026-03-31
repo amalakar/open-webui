@@ -59,7 +59,7 @@ def handle_peewee_migration(DATABASE_URL):
         # Replace the postgresql:// with postgres:// to handle the peewee migration
         db = register_connection(
             DATABASE_URL.replace('postgresql://', 'postgres://'),
-            use_iam_auth=(DATABASE_AUTH == 'iam'),
+            use_iam_auth=(DATABASE_AUTH == 'aws_iam'),
         )
         migrate_dir = OPEN_WEBUI_DIR / 'internal' / 'migrations'
         router = Router(db, logger=log, migrate_dir=migrate_dir)
@@ -159,10 +159,10 @@ else:
         engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 
 
-# When DATABASE_AUTH=iam, generate a fresh RDS IAM auth token for every new
-# database connection.  The token is valid for 15 minutes, but we regenerate
-# on each connect so pool recycling and reconnects always get a valid token.
-if DATABASE_AUTH == 'iam' and 'postgresql' in SQLALCHEMY_DATABASE_URL:
+# When DATABASE_AUTH=aws_iam, generate a fresh RDS IAM auth token for every
+# new database connection.  The token is valid for 15 minutes, but we
+# regenerate on each connect so pool recycling and reconnects always work.
+if DATABASE_AUTH == 'aws_iam' and 'postgresql' in SQLALCHEMY_DATABASE_URL:
     from open_webui.internal.iam import generate_rds_iam_token
 
     @event.listens_for(engine, 'do_connect')

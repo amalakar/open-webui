@@ -380,6 +380,23 @@ else:
 # The IAM role / instance profile must have rds-db:connect permission.
 DATABASE_AUTH = os.environ.get('DATABASE_AUTH', '').lower()
 
+if DATABASE_AUTH == 'aws_iam':
+    _iam_missing = []
+    if not os.environ.get('DATABASE_HOST') and 'postgresql' not in DATABASE_URL:
+        _iam_missing.append('DATABASE_HOST (or a postgresql:// DATABASE_URL)')
+    if not os.environ.get('DATABASE_USER') and 'postgresql' not in DATABASE_URL:
+        _iam_missing.append('DATABASE_USER (or a postgresql:// DATABASE_URL)')
+    if _iam_missing:
+        raise ValueError(
+            f'DATABASE_AUTH=aws_iam requires: {", ".join(_iam_missing)}'
+        )
+
+    # RDS IAM auth mandates TLS.  Ensure sslmode is set in DATABASE_URL.
+    if 'postgresql' in DATABASE_URL and 'sslmode' not in DATABASE_URL:
+        separator = '&' if '?' in DATABASE_URL else '?'
+        DATABASE_URL += f'{separator}sslmode=require'
+        log.info('DATABASE_AUTH=aws_iam: appended sslmode=require to DATABASE_URL')
+
 DATABASE_ENABLE_SQLITE_WAL = os.environ.get('DATABASE_ENABLE_SQLITE_WAL', 'False').lower() == 'true'
 
 DATABASE_USER_ACTIVE_STATUS_UPDATE_INTERVAL = os.environ.get('DATABASE_USER_ACTIVE_STATUS_UPDATE_INTERVAL', None)
